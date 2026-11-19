@@ -73,8 +73,10 @@ async def process_video(
     ffmpeg = executable("ffmpeg")
     if clip_seconds not in (15, 30, 45, 60):
         raise HTTPException(status_code=400, detail="Choose 15, 30, 45 or 60 seconds.")
-    if aspect not in ("9:16", "1:1", "16:9"):
+    supported_aspects = ("9:16", "1:1", "16:9")
+    if aspect != "all" and aspect not in supported_aspects:
         raise HTTPException(status_code=400, detail="Unsupported aspect ratio.")
+    export_aspects = supported_aspects if aspect == "all" else (aspect,)
     if resolution not in ("720", "1080"):
         raise HTTPException(status_code=400, detail="Choose 720p or 1080p.")
     if subtitle_mode not in ("off", "auto"):
@@ -105,12 +107,11 @@ async def process_video(
         if duration < clip_seconds:
             raise HTTPException(status_code=400, detail=f"Video is shorter than {clip_seconds} seconds.")
 
-        if aspect == "9:16":
-            width, height = ((720, 1280) if resolution == "720" else (1080, 1920))
-        elif aspect == "1:1":
-            width = height = int(resolution)
-        else:
-            width, height = ((1280, 720) if resolution == "720" else (1920, 1080))
+        dimensions = {
+            "9:16": ((720, 1280) if resolution == "720" else (1080, 1920)),
+            "1:1": (int(resolution), int(resolution)),
+            "16:9": ((1280, 720) if resolution == "720" else (1920, 1080)),
+        }
 
         subtitle_path = job_dir / "subtitles.srt" if subtitle_mode == "auto" else None
         subtitle_count = 0
@@ -131,22 +132,25 @@ async def process_video(
 
         outputs = []
         for index, (start, segment_length) in enumerate(clip_specs):
-            output = job_dir / f"clip_{index + 1:03d}.mp4"
-            scale_pad = (
-                f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
-                f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1"
-            )
-            command = [
-                ffmpeg, "-y", "-ss", str(start), "-i", str(source),
-                "-t", str(segment_length), "-vf", scale_pad,
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-                "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
-                str(output)
-            ]
-            result = subprocess.run(command, capture_output=True, text=True, check=False)
-            if result.returncode:
-                raise HTTPException(status_code=500, detail=f"FFmpeg failed on clip {index + 1}: {(result.stderr or '')[-900:]}")
-            outputs.append(output)
+            for output_aspect in export_aspects:
+                width, height = dimensions[output_aspect]
+                aspect_suffix = output_aspect.replace(":", "x")
+                output = job_dir / f"clip_{index + 1:03d}_{aspect_suffix}.mp4"
+                scale_pad = (
+                    f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+                    f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1"
+                )
+                command = [
+                    ffmpeg, "-y", "-ss", str(start), "-i", str(source),
+                    "-t", str(segment_length), "-vf", scale_pad,
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                    "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+                    str(output)
+                ]
+                result = subprocess.run(command, capture_output=True, text=True, check=False)
+                if result.returncode:
+                    raise HTTPException(status_code=500, detail=f"FFmpeg failed on clip {index + 1} ({output_aspect}): {(result.stderr or '')[-900:]}")
+                outputs.append(output)
 
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
             for output in outputs:
@@ -161,7 +165,7 @@ async def process_video(
                 "download_url": f"/api/download/{zip_path.name}",
                 "subtitle_count": subtitle_count,
                 "highlight_count": len(highlights),
-                "message": f"Created {len(outputs)} " + ("AI-selected highlight clips." if highlights else "clips.") + (f" and {subtitle_count} subtitle lines." if subtitle_count else "")}
+                "message": f"Created {len(outputs)} video files from {len(clip_specs)} source clips in {', '.join(export_aspects)} format(s)." + (" AI-selected highlights were used." if highlights else "") + (f" Included {subtitle_count} subtitle lines." if subtitle_count else "")}
     finally:
         await video.close()
 
