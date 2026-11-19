@@ -25,7 +25,7 @@ form.addEventListener("submit", async (event) => {
   button.disabled = true;
   button.textContent = "Creating clips… please wait";
   statusBox.className = "status";
-  statusBox.textContent = "Processing locally with FFmpeg. Longer videos may take a while.";
+  const wantsSubtitles = document.getElementById("subtitle_mode").value === "auto";\n  statusBox.textContent = wantsSubtitles ? "Creating clips and generating AI subtitles. This may take a while." : "Creating clips on the processing server. Longer videos may take a while.";
   resultBox.hidden = true;
   try {
     const response = await fetch("/api/process", { method: "POST", body: new FormData(form) });
@@ -37,7 +37,7 @@ form.addEventListener("submit", async (event) => {
     const title = document.createElement("strong");
     title.textContent = "✓ " + payload.message;
     const info = document.createElement("p");
-    info.textContent = payload.duration_seconds + " seconds source · Job " + payload.job_id;
+    info.textContent = payload.duration_seconds + " seconds source · Job " + payload.job_id + (payload.subtitle_count ? " · " + payload.subtitle_count + " subtitle lines included" : "");
     resultBox.replaceChildren(title, info, link);
     resultBox.hidden = false;
     statusBox.textContent = "Your clips are ready.";
