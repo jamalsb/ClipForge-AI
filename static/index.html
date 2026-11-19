@@ -38,7 +38,9 @@
             <select id="resolution" name="resolution"><option value="720">720p · Faster</option><option value="1080" selected>1080p · High quality</option></select>
           </div>
         </div>
-        <div class="setting subtitle-setting"><label class="section-label" for="subtitle_mode">5. AI subtitles</label><select id="subtitle_mode" name="subtitle_mode"><option value="off">No subtitles</option><option value="auto">Auto-detect spoken Urdu / English</option></select><small class="setting-help">Adds a timestamped SRT subtitle file to your ZIP. Requires the server AI key.</small></div>\n        <button class="primary" id="submit-btn" type="submit">Create my clips <span>→</span></button>
+        <div class="setting subtitle-setting"><label class="section-label" for="subtitle_mode">5. AI subtitles</label><select id="subtitle_mode" name="subtitle_mode"><option value="off">No subtitles</option><option value="auto">Auto-detect spoken Urdu / English</option></select><small class="setting-help">Adds a timestamped SRT subtitle file to your ZIP. Requires the server AI key.</small></div>
+        <div class="setting highlight-setting"><label class="section-label" for="highlight_mode">6. AI highlight selection</label><select id="highlight_mode" name="highlight_mode"><option value="off">Evenly spaced clips</option><option value="auto">Find the most interesting moments</option></select><small class="setting-help">AI reviews the spoken content and selects the strongest moments. Requires the server AI key.</small></div>
+        <button class="primary" id="submit-btn" type="submit">Create my clips <span>→</span></button>
       </form>
       <div id="status" class="status" role="status" aria-live="polite"></div>
       <div id="result" class="result" hidden></div>
@@ -48,7 +50,7 @@
       <div><span>02</span><b>Social formats</b><small>Vertical, square and landscape.</small></div>
       <div><span>03</span><b>AI subtitles</b><small>Timestamped Urdu or English speech transcription.</small></div>
     </section>
-    <p class="note">Current build: evenly spaced clips plus optional AI speech transcription in the original spoken language. Automatic highlight selection, translated subtitles, burned-in captions and speaker-aware reframing are still in development.</p>
+    <p class="note">Current build: evenly spaced clips plus optional AI speech transcription in the original spoken language. Translated subtitles, burned-in captions and speaker-aware reframing are still in development.</p>
   </main>
   <footer>CLIPFORGE AI <span>·</span> BUILT FOR CREATORS</footer>
   <script src="/static/app.js"></script>
