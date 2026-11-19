@@ -22,14 +22,14 @@ ClipForge AI is being built as a browser-based video clipping service. The curre
 
 These are planned development stages and are not represented as completed features.
 
-## AI subtitle setup
+## AI setup
 AI subtitles use Groq's Whisper transcription API. The application reads the key from the server environment variable `GROQ_API_KEY`.
 
 Never put an API key in frontend JavaScript, this README, a public GitHub file, or a message. Configure it only as a private environment secret on the server that runs ClipForge.
 
 If the key is not configured, normal clip creation still works. Selecting AI subtitles or AI highlight selection returns a clear setup error rather than pretending AI work was completed.
 
-AI highlight selection reuses the timestamped transcript, asks the configured Groq chat model to rank short moments, removes overlapping selections, and exports the selected clips. The ZIP includes `highlights.json` with each selected clip title, reason, and source timestamps. Set `GROQ_HIGHLIGHT_MODEL` as a private server environment variable to override the default chat model.
+AI highlight selection reuses the timestamped transcript, asks Groq's chat model to rank short moments, removes overlapping selections, and exports the selected clips. The ZIP includes `highlights.json` with each selected clip title, reason, and source timestamps. The default chat model is `openai/gpt-oss-20b`; set `GROQ_HIGHLIGHT_MODEL` as a private server environment variable to override it.
 
 The transcription model detects the spoken language and returns timestamped segments. The ZIP includes a `subtitles.srt` file. The SRT is a separate subtitle file; this build does not burn captions into the MP4 clips.
 
