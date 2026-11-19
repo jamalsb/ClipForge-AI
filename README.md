@@ -2,45 +2,51 @@
 
 **Long videos in. Short clips out.**
 
-A local-first video clipping MVP. Choose a video, clip length, aspect ratio and resolution, then export the generated clips as a ZIP file. Video processing runs on your own computer using FFmpeg.
+ClipForge AI is being built as a browser-based video clipping service. The current repository version provides the video-processing API and a mobile-friendly web interface. It can create evenly spaced clips and, when an AI provider key is configured on the server, generate timestamped speech subtitles in the original spoken language.
 
-## Included in this first version
-- Upload a local video (MP4, MOV, MKV, WEBM, AVI, M4V)
-- Generate evenly spaced 15, 30, 45 or 60-second clips
+## Available in this build
+- Upload MP4, MOV, MKV, WEBM, AVI or M4V video
+- Generate 15, 30, 45 or 60-second clips
 - Export vertical (9:16), square (1:1) or landscape (16:9)
 - Export 720p or 1080p
-- Download all clips as a ZIP
-- Local-only web interface and processing server
+- Download clips together as a ZIP
+- Optional Urdu/English multilingual speech transcription to an SRT subtitle file
+- Long audio is extracted and transcribed in smaller chunks
 
-**Not implemented yet:** AI highlight selection, Urdu/English speech-to-text captions, speaker tracking, smart face reframing, silence removal and 4K export. These are planned next stages, not active features in this MVP.
+## Not available yet
+- AI selection of the most interesting moments (current clips are evenly spaced)
+- Translation from one subtitle language to another
+- Captions permanently burned into the video
+- Automatic face tracking and speaker-aware reframing
+- User accounts, cloud job queue and durable object storage
 
-## Requirements
-- Windows 10/11, macOS or Linux
+These are planned development stages and are not represented as completed features.
+
+## AI subtitle setup
+AI subtitles use Groq's Whisper transcription API. The application reads the key from the server environment variable `GROQ_API_KEY`.
+
+Never put an API key in frontend JavaScript, this README, a public GitHub file, or a message. Configure it only as a private environment secret on the server that runs ClipForge.
+
+If the key is not configured, normal clip creation still works. Selecting AI subtitles returns a clear setup error rather than pretending subtitles were created.
+
+The transcription model detects the spoken language and returns timestamped segments. The ZIP includes a `subtitles.srt` file. The SRT is a separate subtitle file; this build does not burn captions into the MP4 clips.
+
+## Run locally for development
+Requirements:
 - Python 3.10+
 - FFmpeg and FFprobe installed and available in PATH
 
-Check FFmpeg in Command Prompt:
+Install dependencies:
 ```bash
-ffmpeg -version
-ffprobe -version
+py -m venv .venv
+.venv\\Scripts\\activate
+pip install -r requirements.txt
+py app.py
 ```
 
-## Run on Windows
-1. Install Python from https://www.python.org/downloads/ (enable **Add Python to PATH**).
-2. Install FFmpeg and add its `bin` folder to PATH.
-3. Download this repository as ZIP and extract it.
-4. Open Command Prompt in the extracted folder.
-5. Run:
-   ```bat
-   py -m venv .venv
-   .venv\Scripts\activate
-   pip install -r requirements.txt
-   py app.py
-   ```
-6. Open http://127.0.0.1:8000
+Open `http://127.0.0.1:8000`.
 
-## Privacy and safety
-The server binds only to `127.0.0.1`, so it is intended for use on your own computer. Uploaded files are stored locally in `work/`. Do not expose this development server to the public internet. Only edit and publish videos you own or have permission to use.
+For an online service, the API must run on a server with FFmpeg installed. The current build still uses the server's local disk for temporary uploads and outputs. It does not yet include durable cloud storage, a background job queue, or multi-user accounts, so it is a development foundation rather than a production-ready public service.
 
 ## Project status
-Version 0.1.0: functional local clipping foundation. See the repository issues/README as the project grows.
+Version 0.2.0 development build. AI speech transcription has been added; automatic highlight selection and full cloud-service infrastructure remain in progress.
