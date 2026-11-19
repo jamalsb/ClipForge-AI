@@ -10,6 +10,8 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from ai_subtitles import transcribe_video
+
 ROOT = Path(__file__).resolve().parent
 WORK = ROOT / "work"
 UPLOADS = WORK / "uploads"
@@ -60,6 +62,7 @@ async def process_video(
     clip_seconds: int = Form(30),
     aspect: str = Form("9:16"),
     resolution: str = Form("1080"),
+    subtitle_mode: str = Form("off"),
 ):
     ffmpeg = executable("ffmpeg")
     if clip_seconds not in (15, 30, 45, 60):
@@ -68,6 +71,8 @@ async def process_video(
         raise HTTPException(status_code=400, detail="Unsupported aspect ratio.")
     if resolution not in ("720", "1080"):
         raise HTTPException(status_code=400, detail="Choose 720p or 1080p.")
+    if subtitle_mode not in ("off", "auto"):
+        raise HTTPException(status_code=400, detail="Unsupported subtitle option.")
 
     suffix = Path(video.filename or "input.mp4").suffix.lower()
     if suffix not in (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"):
@@ -102,6 +107,12 @@ async def process_video(
         else:
             width, height = ((1280, 720) if resolution == "720" else (1920, 1080))
 
+        subtitle_path = None
+        subtitle_count = 0
+        if subtitle_mode == "auto":
+            subtitle_path = job_dir / "subtitles.srt"
+            subtitle_count = transcribe_video(source, subtitle_path, job_dir, duration)
+
         outputs = []
         for index in range(clip_count):
             start = index * clip_seconds
@@ -125,11 +136,14 @@ async def process_video(
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
             for output in outputs:
                 archive.write(output, arcname=output.name)
+            if subtitle_path and subtitle_path.is_file():
+                archive.write(subtitle_path, arcname="subtitles.srt")
 
         return {"job_id": job_id, "clip_count": len(outputs),
                 "duration_seconds": round(duration, 1),
                 "download_url": f"/api/download/{zip_path.name}",
-                "message": f"Created {len(outputs)} clips."}
+                "subtitle_count": subtitle_count,
+                "message": f"Created {len(outputs)} clips." + (f" and {subtitle_count} subtitle lines." if subtitle_count else "")}
     finally:
         await video.close()
 
