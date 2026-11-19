@@ -82,7 +82,7 @@ def select_highlights(
             "reason": reason,
         })
 
-    valid.sort(key=lambda clip: clip["start"])
+    # Keep the model's relevance ranking while removing overlapping selections.
     selected: list[dict] = []
     for clip in valid:
         if all(
@@ -92,6 +92,7 @@ def select_highlights(
             selected.append(clip)
         if len(selected) >= max_clips:
             break
+    selected.sort(key=lambda clip: clip["start"])
 
     if not selected:
         raise HTTPException(status_code=422, detail="AI could not find suitable highlight moments in this video.")
