@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import uuid
@@ -11,6 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from ai_subtitles import transcribe_video
+from ai_highlights import select_highlights
 
 ROOT = Path(__file__).resolve().parent
 WORK = ROOT / "work"
@@ -54,7 +56,8 @@ def home():
 def health():
     return {"ok": True, "ffmpeg_available": bool(shutil.which("ffmpeg")),
             "ffprobe_available": bool(shutil.which("ffprobe")),
-            "ai_subtitles_enabled": bool(__import__("os").getenv("GROQ_API_KEY"))}
+            "ai_subtitles_enabled": bool(__import__("os").getenv("GROQ_API_KEY")),
+            "ai_highlights_enabled": bool(__import__("os").getenv("GROQ_API_KEY"))}
 
 
 @app.post("/api/process")
@@ -64,6 +67,7 @@ async def process_video(
     aspect: str = Form("9:16"),
     resolution: str = Form("1080"),
     subtitle_mode: str = Form("off"),
+    highlight_mode: str = Form("off"),
 ):
     ffmpeg = executable("ffmpeg")
     if clip_seconds not in (15, 30, 45, 60):
@@ -74,6 +78,8 @@ async def process_video(
         raise HTTPException(status_code=400, detail="Choose 720p or 1080p.")
     if subtitle_mode not in ("off", "auto"):
         raise HTTPException(status_code=400, detail="Unsupported subtitle option.")
+    if highlight_mode not in ("off", "auto"):
+        raise HTTPException(status_code=400, detail="Unsupported highlight option.")
 
     suffix = Path(video.filename or "input.mp4").suffix.lower()
     if suffix not in (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"):
@@ -95,11 +101,8 @@ async def process_video(
                 target.write(chunk)
 
         duration = video_duration(source)
-        clip_count = int(duration // clip_seconds)
-        if clip_count < 1:
+        if duration < clip_seconds:
             raise HTTPException(status_code=400, detail=f"Video is shorter than {clip_seconds} seconds.")
-        if clip_count > 200:
-            raise HTTPException(status_code=400, detail="This would create over 200 clips. Choose a longer clip length.")
 
         if aspect == "9:16":
             width, height = ((720, 1280) if resolution == "720" else (1080, 1920))
@@ -108,15 +111,25 @@ async def process_video(
         else:
             width, height = ((1280, 720) if resolution == "720" else (1920, 1080))
 
-        subtitle_path = None
+        subtitle_path = job_dir / "subtitles.srt" if subtitle_mode == "auto" else None
         subtitle_count = 0
-        if subtitle_mode == "auto":
-            subtitle_path = job_dir / "subtitles.srt"
-            subtitle_count = transcribe_video(source, subtitle_path, job_dir, duration)
+        highlights = []
+        transcript_segments = []
+        if subtitle_mode == "auto" or highlight_mode == "auto":
+            transcript_segments = transcribe_video(source, subtitle_path, job_dir, duration)
+            subtitle_count = len(transcript_segments) if subtitle_path else 0
+
+        if highlight_mode == "auto":
+            highlights = select_highlights(transcript_segments, duration, clip_seconds)
+            clip_specs = [(item["start"], clip_seconds) for item in highlights]
+        else:
+            clip_count = int(duration // clip_seconds)
+            if clip_count > 200:
+                raise HTTPException(status_code=400, detail="This would create over 200 clips. Choose a longer clip length.")
+            clip_specs = [(index * clip_seconds, clip_seconds) for index in range(clip_count)]
 
         outputs = []
-        for index in range(clip_count):
-            start = index * clip_seconds
+        for index, (start, segment_length) in enumerate(clip_specs):
             output = job_dir / f"clip_{index + 1:03d}.mp4"
             scale_pad = (
                 f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
@@ -124,7 +137,7 @@ async def process_video(
             )
             command = [
                 ffmpeg, "-y", "-ss", str(start), "-i", str(source),
-                "-t", str(clip_seconds), "-vf", scale_pad,
+                "-t", str(segment_length), "-vf", scale_pad,
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
                 "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
                 str(output)
@@ -139,12 +152,15 @@ async def process_video(
                 archive.write(output, arcname=output.name)
             if subtitle_path and subtitle_path.is_file():
                 archive.write(subtitle_path, arcname="subtitles.srt")
+            if highlights:
+                archive.writestr("highlights.json", json.dumps(highlights, ensure_ascii=False, indent=2))
 
         return {"job_id": job_id, "clip_count": len(outputs),
                 "duration_seconds": round(duration, 1),
                 "download_url": f"/api/download/{zip_path.name}",
                 "subtitle_count": subtitle_count,
-                "message": f"Created {len(outputs)} clips." + (f" and {subtitle_count} subtitle lines." if subtitle_count else "")}
+                "highlight_count": len(highlights),
+                "message": f"Created {len(outputs)} " + ("AI-selected highlight clips." if highlights else "clips.") + (f" and {subtitle_count} subtitle lines." if subtitle_count else "")}
     finally:
         await video.close()
 
