@@ -2,14 +2,14 @@
 
 **Long videos in. Short clips out.**
 
-ClipForge AI is being built as a browser-based video clipping service. The current repository version provides the video-processing API and a mobile-friendly web interface. It can create evenly spaced clips and, when an AI provider key is configured on the server, generate timestamped speech subtitles in the original spoken language.
+ClipForge AI is being built as a browser-based video clipping service. The current repository version provides the video-processing API and a mobile-friendly web interface. It can create evenly spaced clips, export each clip in vertical, square and landscape formats in one run, and, when an AI provider key is configured on the server, generate timestamped speech subtitles in the original spoken language.
 
 ## Available in this build
 - Upload MP4, MOV, MKV, WEBM, AVI or M4V video
 - Generate 15, 30, 45 or 60-second clips
-- Export vertical (9:16), square (1:1) or landscape (16:9)
+- Export vertical (9:16), square (1:1) or landscape (16:9), individually or all three formats for every source clip
 - Export 720p or 1080p
-- Download clips together as a ZIP
+- Download clips together as a ZIP, with format labels in each filename
 - Optional Urdu/English multilingual speech transcription to an SRT subtitle file
 - AI-ranked short highlights selected from the transcript, with title/reason metadata in the ZIP
 - Long audio is extracted and transcribed in smaller chunks
