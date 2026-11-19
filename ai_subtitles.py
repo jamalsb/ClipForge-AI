@@ -16,7 +16,7 @@ def _stamp(seconds: float) -> str:
     return f"{hours:02}:{minutes:02}:{secs:02},{millis:03}"
 
 
-def transcribe_video(video_path: Path, output_srt: Path, temp_dir: Path, duration: float) -> int:
+def transcribe_video(video_path: Path, output_srt: Path | None, temp_dir: Path, duration: float) -> list[tuple[float, float, str]]:
     """Create timestamped subtitles in the video's spoken language using Groq Whisper."""
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
