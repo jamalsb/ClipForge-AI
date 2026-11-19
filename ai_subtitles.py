@@ -80,6 +80,6 @@ def transcribe_video(video_path: Path, output_srt: Path | None, temp_dir: Path, 
     if output_srt is not None:
         with output_srt.open("w", encoding="utf-8-sig") as handle:
             for index, (start, end, text) in enumerate(entries, 1):
-                safe_text = text.replace("-->", "→").replace("\\n", " ").strip()
-                handle.write(f"{index}\\n{_stamp(start)} --> {_stamp(end)}\\n{safe_text}\\n\\n")
+                safe_text = text.replace("-->", "→").replace("\n", " ").strip()
+                handle.write(f"{index}\n{_stamp(start)} --> {_stamp(end)}\n{safe_text}\n\n")
     return entries
