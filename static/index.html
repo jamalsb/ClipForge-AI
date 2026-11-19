@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090d18">
+  <title>ClipForge AI | Long videos in. Short clips out.</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">CF</span><span>ClipForge <b>AI</b></span></a>
+    <span class="local-pill"><i></i> Local processing</span>
+  </header>
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">YOUR VIDEO. MULTIPLE MOMENTS.</p>
+      <h1>Long videos in.<br><span>Short clips out.</span></h1>
+      <p class="intro">Turn a long video into ready-to-share short clips. Choose your format and let ClipForge do the cutting on your computer.</p>
+    </section>
+    <section class="workspace">
+      <form id="clip-form">
+        <label class="section-label" for="video">1. Choose your video</label>
+        <label class="dropzone" for="video">
+          <span class="upload-icon">↑</span>
+          <strong id="file-title">Drop a video here or browse files</strong>
+          <small id="file-meta">MP4, MOV, MKV, WEBM, AVI · Processed locally</small>
+          <input id="video" name="video" type="file" accept="video/*" required>
+        </label>
+        <div class="settings-grid">
+          <div class="setting"><label class="section-label" for="clip_seconds">2. Clip length</label>
+            <select id="clip_seconds" name="clip_seconds"><option value="15">15 seconds</option><option value="30" selected>30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select>
+          </div>
+          <div class="setting"><label class="section-label" for="aspect">3. Video format</label>
+            <select id="aspect" name="aspect"><option value="9:16">Vertical · Shorts / Reels / TikTok</option><option value="1:1">Square · Feed</option><option value="16:9">Landscape · YouTube</option></select>
+          </div>
+          <div class="setting"><label class="section-label" for="resolution">4. Resolution</label>
+            <select id="resolution" name="resolution"><option value="720">720p · Faster</option><option value="1080" selected>1080p · High quality</option></select>
+          </div>
+        </div>
+        <button class="primary" id="submit-btn" type="submit">Create my clips <span>→</span></button>
+      </form>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+      <div id="result" class="result" hidden></div>
+    </section>
+    <section class="feature-row">
+      <div><span>01</span><b>Clip batches</b><small>Make multiple clips in one run.</small></div>
+      <div><span>02</span><b>Social formats</b><small>Vertical, square and landscape.</small></div>
+      <div><span>03</span><b>Local processing</b><small>Your source video stays on your computer.</small></div>
+    </section>
+    <p class="note">MVP note: this version cuts evenly spaced segments. AI highlight detection, captions and speaker-aware reframing are planned for future releases.</p>
+  </main>
+  <footer>CLIPFORGE AI <span>·</span> BUILT FOR CREATORS</footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>
