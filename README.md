@@ -11,10 +11,11 @@ ClipForge AI is being built as a browser-based video clipping service. The curre
 - Export 720p or 1080p
 - Download clips together as a ZIP
 - Optional Urdu/English multilingual speech transcription to an SRT subtitle file
+- AI-ranked short highlights selected from the transcript, with title/reason metadata in the ZIP
 - Long audio is extracted and transcribed in smaller chunks
 
 ## Not available yet
-- AI selection of the most interesting moments (current clips are evenly spaced)
+- Translation from one subtitle language to another
 - Translation from one subtitle language to another
 - Captions permanently burned into the video
 - Automatic face tracking and speaker-aware reframing
@@ -49,4 +50,4 @@ Open `http://127.0.0.1:8000`.
 For an online service, the API must run on a server with FFmpeg installed. The current build still uses the server's local disk for temporary uploads and outputs. It does not yet include durable cloud storage, a background job queue, or multi-user accounts, so it is a development foundation rather than a production-ready public service.
 
 ## Project status
-Version 0.2.0 development build. AI speech transcription has been added; automatic highlight selection and full cloud-service infrastructure remain in progress.
+Version 0.3.0 development build. AI speech transcription and transcript-based highlight selection are implemented behind the Groq API key. Full cloud-service infrastructure, translated subtitles, burned-in captions and smart reframing remain in progress.
