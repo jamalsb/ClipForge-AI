@@ -31,7 +31,9 @@ def select_highlights(
     if not transcript.strip():
         raise HTTPException(status_code=422, detail="There is no transcript to analyse for highlights.")
 
-    model = os.getenv("GROQ_HIGHLIGHT_MODEL", "llama-3.3-70b-versatile")
+    # Groq retired the older Llama 3.3 model for free/developer usage.
+    # GPT-OSS 20B is the current lighter default; override on the server if needed.
+    model = os.getenv("GROQ_HIGHLIGHT_MODEL", "openai/gpt-oss-20b")
     client = Groq(api_key=api_key, timeout=120.0, max_retries=2)
     prompt = (
         "You are an expert short-form video editor. Find the strongest self-contained moments "
