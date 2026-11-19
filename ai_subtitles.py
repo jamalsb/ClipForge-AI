@@ -77,8 +77,9 @@ def transcribe_video(video_path: Path, output_srt: Path | None, temp_dir: Path, 
     if not entries:
         raise HTTPException(status_code=422, detail="No spoken words were detected in this video.")
 
-    with output_srt.open("w", encoding="utf-8-sig") as handle:
-        for index, (start, end, text) in enumerate(entries, 1):
-            safe_text = text.replace("-->", "→").replace("\\n", " ").strip()
-            handle.write(f"{index}\n{_stamp(start)} --> {_stamp(end)}\n{safe_text}\n\n")
-    return len(entries)
+    if output_srt is not None:
+        with output_srt.open("w", encoding="utf-8-sig") as handle:
+            for index, (start, end, text) in enumerate(entries, 1):
+                safe_text = text.replace("-->", "→").replace("\\n", " ").strip()
+                handle.write(f"{index}\\n{_stamp(start)} --> {_stamp(end)}\\n{safe_text}\\n\\n")
+    return entries
