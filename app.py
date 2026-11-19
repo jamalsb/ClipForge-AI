@@ -19,7 +19,7 @@ OUTPUTS = WORK / "outputs"
 for directory in (UPLOADS, OUTPUTS):
     directory.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="ClipForge AI", version="0.1.0")
+app = FastAPI(title="ClipForge AI", version="0.2.0")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
