@@ -16,7 +16,7 @@
     <section class="hero">
       <p class="eyebrow">YOUR VIDEO. MULTIPLE MOMENTS.</p>
       <h1>Long videos in.<br><span>Short clips out.</span></h1>
-      <p class="intro">Turn a long video into ready-to-share short clips. Choose your format and let ClipForge process your video and prepare share-ready clips.</p>
+      <p class="intro">Turn a long video into ready-to-share short clips. Choose one format or generate vertical, square and landscape versions of every clip in one run.</p>
     </section>
     <section class="workspace">
       <form id="clip-form">
@@ -32,7 +32,7 @@
             <select id="clip_seconds" name="clip_seconds"><option value="15">15 seconds</option><option value="30" selected>30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select>
           </div>
           <div class="setting"><label class="section-label" for="aspect">3. Video format</label>
-            <select id="aspect" name="aspect"><option value="9:16">Vertical · Shorts / Reels / TikTok</option><option value="1:1">Square · Feed</option><option value="16:9">Landscape · YouTube</option></select>
+            <select id="aspect" name="aspect"><option value="all" selected>All formats · 9:16 + 1:1 + 16:9</option><option value="9:16">Vertical · Shorts / Reels / TikTok</option><option value="1:1">Square · Instagram / Facebook Feed</option><option value="16:9">Landscape · YouTube / Facebook / X</option></select>
           </div>
           <div class="setting"><label class="section-label" for="resolution">4. Resolution</label>
             <select id="resolution" name="resolution"><option value="720">720p · Faster</option><option value="1080" selected>1080p · High quality</option></select>
@@ -47,10 +47,10 @@
     </section>
     <section class="feature-row">
       <div><span>01</span><b>Clip batches</b><small>Make multiple clips in one run.</small></div>
-      <div><span>02</span><b>Social formats</b><small>Vertical, square and landscape.</small></div>
+      <div><span>02</span><b>Social formats</b><small>Export all three formats together.</small></div>
       <div><span>03</span><b>AI subtitles</b><small>Timestamped Urdu or English speech transcription.</small></div>
     </section>
-    <p class="note">Current build: evenly spaced clips plus optional AI speech transcription in the original spoken language. Translated subtitles, burned-in captions and speaker-aware reframing are still in development.</p>
+    <p class="note">All formats mode creates 9:16, 1:1 and 16:9 versions of each selected clip. Translated subtitles, burned-in captions and speaker-aware reframing are still in development.</p>
   </main>
   <footer>CLIPFORGE AI <span>·</span> BUILT FOR CREATORS</footer>
   <script src="/static/app.js"></script>
