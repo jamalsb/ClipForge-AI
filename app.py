@@ -58,7 +58,7 @@ def health():
     return {"ok": True, "ffmpeg_available": bool(shutil.which("ffmpeg")),
             "ffprobe_available": bool(shutil.which("ffprobe")),
             "ai_subtitles_enabled": bool(os.getenv("GROQ_API_KEY")),
-            "ai_highlights_enabled": bool(__import__("os").getenv("GROQ_API_KEY"))}
+            "ai_highlights_enabled": bool(os.getenv("GROQ_API_KEY"))}
 
 
 @app.post("/api/process")
