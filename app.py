@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import uuid
@@ -21,7 +22,7 @@ OUTPUTS = WORK / "outputs"
 for directory in (UPLOADS, OUTPUTS):
     directory.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="ClipForge AI", version="0.2.0")
+app = FastAPI(title="ClipForge AI", version="0.3.0")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -56,7 +57,7 @@ def home():
 def health():
     return {"ok": True, "ffmpeg_available": bool(shutil.which("ffmpeg")),
             "ffprobe_available": bool(shutil.which("ffprobe")),
-            "ai_subtitles_enabled": bool(__import__("os").getenv("GROQ_API_KEY")),
+            "ai_subtitles_enabled": bool(os.getenv("GROQ_API_KEY")),
             "ai_highlights_enabled": bool(__import__("os").getenv("GROQ_API_KEY"))}
 
 
