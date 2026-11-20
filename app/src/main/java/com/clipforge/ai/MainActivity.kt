@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity() {
         page.addView(title, matchWrap())
         page.addView(subtitle, matchWrap())
         page.addView(previewLabel, matchWrap())
-        page.addView(preview, matchWrap())
+        page.addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(210)))
         page.addView(chooseButton, matchWrap())
         page.addView(lengthLabel, matchWrap())
         page.addView(lengthSpinner, matchWrap())
