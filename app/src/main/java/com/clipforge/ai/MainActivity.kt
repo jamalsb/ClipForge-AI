@@ -30,6 +30,11 @@ class MainActivity : ComponentActivity() {
     private lateinit var lengthSpinner: Spinner
     private lateinit var preview: PlayerView
     private lateinit var clipsList: LinearLayout
+    private lateinit var aiHighlights: CheckBox
+    private lateinit var apiKeyInput: EditText
+    private val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private var clipTitles = mutableListOf<String>()
+    private var clipReasons = mutableListOf<String>()
     private var player: ExoPlayer? = null
     private var selectedVideo: Uri? = null
     private var videoDurationMs = 0L
@@ -102,6 +107,49 @@ class MainActivity : ComponentActivity() {
             text = "Clip length"; textSize = 16f
             setTextColor(0xFFF4F6FF.toInt()); setPadding(0, 20, 0, 8)
         }
+        val aiSettingsTitle = TextView(this).apply {
+            text = "Groq AI Settings"; textSize = 18f
+            setTextColor(0xFFF4F6FF.toInt()); setPadding(0, dp(20), 0, dp(8))
+        }
+        val aiSettingsHelp = TextView(this).apply {
+            text = "Enter your personal Groq API key. It is encrypted and saved on this phone."
+            textSize = 12f; setTextColor(0xFF9DAAC2.toInt())
+        }
+        apiKeyInput = EditText(this).apply {
+            hint = if (GroqKeyStore.read(this@MainActivity).isNullOrBlank()) "Paste Groq API key" else "API key already saved"
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setTextColor(0xFFF4F6FF.toInt())
+            setHintTextColor(0xFF8491A8.toInt())
+        }
+        val saveKeyButton = Button(this).apply {
+            text = "Save API key on this phone"
+            setOnClickListener {
+                val key = apiKeyInput.text.toString().trim()
+                if (!key.startsWith("gsk_")) {
+                    status.text = "Please enter a valid Groq API key."
+                } else {
+                    try {
+                        GroqKeyStore.save(this@MainActivity, key)
+                        apiKeyInput.text.clear()
+                        apiKeyInput.hint = "API key already saved"
+                        status.text = "Groq API key saved securely on this phone."
+                    } catch (e: Exception) {
+                        status.text = "Could not save API key: " + (e.message ?: "storage error")
+                    }
+                }
+            }
+        }
+        aiHighlights = CheckBox(this).apply {
+            text = "AI Auto Select Highlights + Titles"
+            textSize = 15f
+            setTextColor(0xFFF4F6FF.toInt())
+            buttonTintList = android.content.res.ColorStateList.valueOf(0xFF8B7CFF.toInt())
+        }
+        val aiHelp = TextView(this).apply {
+            text = "AI analyses spoken audio, chooses up to 10 strong moments and creates a title for each. Internet and Groq API usage are required."
+            textSize = 12f; setTextColor(0xFF9DAAC2.toInt())
+        }
         lengthSpinner = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
                 listOf("15 seconds", "30 seconds", "45 seconds", "60 seconds"))
@@ -126,6 +174,12 @@ class MainActivity : ComponentActivity() {
         page.addView(previewLabel, matchWrap())
         page.addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(230)))
         page.addView(chooseButton, matchWrap())
+        page.addView(aiSettingsTitle, matchWrap())
+        page.addView(aiSettingsHelp, matchWrap())
+        page.addView(apiKeyInput, matchWrap())
+        page.addView(saveKeyButton, matchWrap())
+        page.addView(aiHighlights, matchWrap())
+        page.addView(aiHelp, matchWrap())
         page.addView(lengthLabel, matchWrap())
         page.addView(lengthSpinner, matchWrap())
         page.addView(createButton, matchWrap())
@@ -155,15 +209,55 @@ class MainActivity : ComponentActivity() {
         val uri = selectedVideo ?: return
         val seconds = listOf(15, 30, 45, 60)[lengthSpinner.selectedItemPosition]
         val clipMs = seconds * 1000L
+        if (aiHighlights.isChecked) {
+            val key = GroqKeyStore.read(this)
+            if (key.isNullOrBlank()) {
+                status.text = "Save your Groq API key before using AI highlights."
+                return
+            }
+            createButton.isEnabled = false
+            chooseButton.isEnabled = false
+            status.text = "AI is analysing the video's speech and selecting highlights. Keep the app open."
+            worker.execute {
+                try {
+                    val selected = GroqHighlightAnalyzer.analyse(this, uri, videoDurationMs, clipMs, key)
+                    runOnUiThread {
+                        pendingClips.clear()
+                        clipTitles.clear()
+                        clipReasons.clear()
+                        selected.forEach { clip ->
+                            pendingClips.add(clip.startMs to clip.endMs)
+                            clipTitles.add(clip.title)
+                            clipReasons.add(clip.reason)
+                        }
+                        completedCount = 0
+                        clipsList.removeAllViews()
+                        status.text = "AI selected " + selected.size + " highlights. Creating clips..."
+                        exportNext(uri)
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        status.text = "AI analysis failed: " + (e.message ?: "Check internet and API key.")
+                        createButton.isEnabled = true
+                        chooseButton.isEnabled = true
+                    }
+                }
+            }
+            return
+        }
         val count = (videoDurationMs / clipMs).toInt()
         if (count < 1) {
             status.text = "This video is shorter than " + seconds + " seconds. Choose a shorter clip length."
             return
         }
         pendingClips.clear()
+        clipTitles.clear()
+        clipReasons.clear()
         repeat(count) { index ->
             val start = index * clipMs
             pendingClips.add(start to (start + clipMs))
+            clipTitles.add("Clip " + (index + 1))
+            clipReasons.add("")
         }
         completedCount = 0
         clipsList.removeAllViews()
@@ -197,7 +291,9 @@ class MainActivity : ComponentActivity() {
                 try {
                     val savedUri = saveToGallery(output, "ClipForge_" + clipNumber + "_" + (startMs / 1000) + "s.mp4")
                     completedCount++
-                    addClipRow(clipNumber, startMs, endMs, savedUri)
+                    addClipRow(clipNumber, startMs, endMs, savedUri,
+                        clipTitles.getOrNull(clipNumber - 1) ?: ("Clip " + clipNumber),
+                        clipReasons.getOrNull(clipNumber - 1).orEmpty())
                     output.delete()
                     status.text = "Exported " + completedCount + " clips..."
                     exportNext(uri)
@@ -222,14 +318,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun addClipRow(number: Int, startMs: Long, endMs: Long, uri: Uri) {
+    private fun addClipRow(number: Int, startMs: Long, endMs: Long, uri: Uri, title: String, reason: String) {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(5), 0, dp(5))
         }
         val info = TextView(this).apply {
-            text = "Clip " + number + " · " + (startMs / 1000) + "s to " + (endMs / 1000) + "s"
+            text = title + "\n" + (startMs / 1000) + "s to " + (endMs / 1000) + "s"
             textSize = 14f
             setTextColor(0xFFD5DDF0.toInt())
         }
@@ -242,6 +338,13 @@ class MainActivity : ComponentActivity() {
         }
         row.addView(info, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         row.addView(play, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        if (reason.isNotBlank()) {
+            row.addView(TextView(this).apply {
+                text = reason
+                textSize = 12f
+                setTextColor(0xFF9DAAC2.toInt())
+            }, matchWrap())
+        }
         clipsList.addView(row, matchWrap())
     }
 
@@ -285,6 +388,7 @@ class MainActivity : ComponentActivity() {
         preview.player = null
         player?.release()
         player = null
+        worker.shutdownNow()
         super.onDestroy()
     }
 }
