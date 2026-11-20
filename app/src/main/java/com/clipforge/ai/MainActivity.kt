@@ -13,10 +13,13 @@ import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
+import androidx.media3.ui.PlayerView
 import java.io.File
 import java.io.FileInputStream
 
@@ -25,8 +28,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var chooseButton: Button
     private lateinit var createButton: Button
     private lateinit var lengthSpinner: Spinner
-    private lateinit var preview: VideoView
+    private lateinit var preview: PlayerView
     private lateinit var clipsList: LinearLayout
+    private var player: ExoPlayer? = null
     private var selectedVideo: Uri? = null
     private var videoDurationMs = 0L
     private val pendingClips = ArrayDeque<Pair<Long, Long>>()
@@ -41,12 +45,8 @@ class MainActivity : ComponentActivity() {
             catch (_: SecurityException) { }
             videoDurationMs = readDuration(uri)
             if (videoDurationMs > 0) {
-                preview.setVideoURI(uri)
-                preview.setOnPreparedListener { player ->
-                    player.isLooping = true
-                    preview.start()
-                }
-                status.text = "Video selected · " + (videoDurationMs / 1000) + " seconds\nPreview is ready. Choose a clip length and tap Create clips."
+                playPreview(uri)
+                status.text = "Video selected · " + (videoDurationMs / 1000) + " seconds\nPreview is loading. Press Play if playback is paused."
             } else {
                 status.text = "Could not read this video's duration. Please choose another video."
             }
@@ -57,6 +57,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         buildScreen()
+    }
+
+    private fun playPreview(uri: Uri) {
+        if (player == null) {
+            player = ExoPlayer.Builder(this).build().also { preview.player = it }
+        }
+        player?.apply {
+            stop()
+            clearMediaItems()
+            setMediaItem(MediaItem.fromUri(uri))
+            prepare()
+            playWhenReady = true
+        }
     }
 
     private fun buildScreen() {
@@ -79,15 +92,16 @@ class MainActivity : ComponentActivity() {
             text = "Video preview"; textSize = 17f
             setTextColor(0xFFF4F6FF.toInt()); setPadding(0, 8, 0, 8)
         }
-        preview = VideoView(this).apply {
+        preview = PlayerView(this).apply {
             setBackgroundColor(0xFF000000.toInt())
+            useController = true
+            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+            setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT)
+            setSurfaceType(PlayerView.SURFACE_TYPE_TEXTURE_VIEW)
             layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(210)
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(230)
             )
         }
-        val controller = MediaController(this)
-        controller.setAnchorView(preview)
-        preview.setMediaController(controller)
 
         chooseButton = Button(this).apply {
             text = "Choose video"
@@ -119,7 +133,7 @@ class MainActivity : ComponentActivity() {
         page.addView(title, matchWrap())
         page.addView(subtitle, matchWrap())
         page.addView(previewLabel, matchWrap())
-        page.addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(210)))
+        page.addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(230)))
         page.addView(chooseButton, matchWrap())
         page.addView(lengthLabel, matchWrap())
         page.addView(lengthSpinner, matchWrap())
@@ -231,9 +245,7 @@ class MainActivity : ComponentActivity() {
         val play = Button(this).apply {
             text = "Preview"
             setOnClickListener {
-                preview.stopPlayback()
-                preview.setVideoURI(uri)
-                preview.setOnPreparedListener { preview.start() }
+                playPreview(uri)
                 status.text = "Playing clip " + number
             }
         }
@@ -271,5 +283,17 @@ class MainActivity : ComponentActivity() {
         currentOutput?.delete()
         createButton.isEnabled = true
         chooseButton.isEnabled = true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        player?.pause()
+    }
+
+    override fun onDestroy() {
+        preview.player = null
+        player?.release()
+        player = null
+        super.onDestroy()
     }
 }
