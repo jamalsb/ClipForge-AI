@@ -25,11 +25,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var chooseButton: Button
     private lateinit var createButton: Button
     private lateinit var lengthSpinner: Spinner
+    private lateinit var preview: VideoView
+    private lateinit var clipsList: LinearLayout
     private var selectedVideo: Uri? = null
     private var videoDurationMs = 0L
     private val pendingClips = ArrayDeque<Pair<Long, Long>>()
     private var completedCount = 0
     private var currentOutput: File? = null
+    private var activeTransformer: Transformer? = null
 
     private val videoPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -37,9 +40,16 @@ class MainActivity : ComponentActivity() {
             try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
             catch (_: SecurityException) { }
             videoDurationMs = readDuration(uri)
-            status.text = if (videoDurationMs > 0) {
-                "Video selected · " + (videoDurationMs / 1000) + " seconds\nChoose a clip length and tap Create clips."
-            } else "Could not read this video's duration. Please choose another video."
+            if (videoDurationMs > 0) {
+                preview.setVideoURI(uri)
+                preview.setOnPreparedListener { player ->
+                    player.isLooping = true
+                    preview.start()
+                }
+                status.text = "Video selected · " + (videoDurationMs / 1000) + " seconds\nPreview is ready. Choose a clip length and tap Create clips."
+            } else {
+                status.text = "Could not read this video's duration. Please choose another video."
+            }
             createButton.isEnabled = videoDurationMs > 0
         }
     }
@@ -63,15 +73,29 @@ class MainActivity : ComponentActivity() {
         val subtitle = TextView(this).apply {
             text = "Long videos in. Short clips out."; textSize = 15f
             setTextColor(0xFF9DAAC2.toInt()); gravity = Gravity.CENTER
-            setPadding(0, 8, 0, 28)
+            setPadding(0, 8, 0, 20)
         }
+        val previewLabel = TextView(this).apply {
+            text = "Video preview"; textSize = 17f
+            setTextColor(0xFFF4F6FF.toInt()); setPadding(0, 8, 0, 8)
+        }
+        preview = VideoView(this).apply {
+            setBackgroundColor(0xFF000000.toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(210)
+            )
+        }
+        val controller = MediaController(this)
+        controller.setAnchorView(preview)
+        preview.setMediaController(controller)
+
         chooseButton = Button(this).apply {
             text = "Choose video"
             setOnClickListener { videoPicker.launch(arrayOf("video/*")) }
         }
         val lengthLabel = TextView(this).apply {
             text = "Clip length"; textSize = 16f
-            setTextColor(0xFFF4F6FF.toInt()); setPadding(0, 24, 0, 8)
+            setTextColor(0xFFF4F6FF.toInt()); setPadding(0, 20, 0, 8)
         }
         lengthSpinner = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
@@ -85,18 +109,29 @@ class MainActivity : ComponentActivity() {
         status = TextView(this).apply {
             text = "Choose a video from your phone to begin."
             textSize = 14f; setTextColor(0xFFD5DDF0.toInt())
-            setPadding(0, 22, 0, 12)
+            setPadding(0, 18, 0, 16)
         }
+        val clipsTitle = TextView(this).apply {
+            text = "Created clips"; textSize = 19f
+            setTextColor(0xFFF4F6FF.toInt()); setPadding(0, 16, 0, 8)
+        }
+        clipsList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         page.addView(title, matchWrap())
         page.addView(subtitle, matchWrap())
+        page.addView(previewLabel, matchWrap())
+        page.addView(preview, matchWrap())
         page.addView(chooseButton, matchWrap())
         page.addView(lengthLabel, matchWrap())
         page.addView(lengthSpinner, matchWrap())
         page.addView(createButton, matchWrap())
         page.addView(status, matchWrap())
+        page.addView(clipsTitle, matchWrap())
+        page.addView(clipsList, matchWrap())
         scroll.addView(page)
         setContentView(scroll)
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun matchWrap() = LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
@@ -126,6 +161,7 @@ class MainActivity : ComponentActivity() {
             pendingClips.add(start to (start + clipMs))
         }
         completedCount = 0
+        clipsList.removeAllViews()
         createButton.isEnabled = false
         chooseButton.isEnabled = false
         status.text = "Preparing " + count + " clips on this phone. Keep ClipForge open while exporting."
@@ -154,8 +190,9 @@ class MainActivity : ComponentActivity() {
                 exportResult: ExportResult
             ) {
                 try {
-                    saveToGallery(output, "ClipForge_" + clipNumber + "_" + (startMs / 1000) + "s.mp4")
+                    val savedUri = saveToGallery(output, "ClipForge_" + clipNumber + "_" + (startMs / 1000) + "s.mp4")
                     completedCount++
+                    addClipRow(clipNumber, startMs, endMs, savedUri)
                     output.delete()
                     status.text = "Exported " + completedCount + " clips..."
                     exportNext(uri)
@@ -173,13 +210,39 @@ class MainActivity : ComponentActivity() {
             }
         }
         try {
-            Transformer.Builder(this).addListener(listener).build().start(editedItem, output.absolutePath)
+            activeTransformer = Transformer.Builder(this).addListener(listener).build()
+            activeTransformer?.start(editedItem, output.absolutePath)
         } catch (error: Exception) {
             fail("Could not start export: " + error.message)
         }
     }
 
-    private fun saveToGallery(source: File, displayName: String) {
+    private fun addClipRow(number: Int, startMs: Long, endMs: Long, uri: Uri) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(5), 0, dp(5))
+        }
+        val info = TextView(this).apply {
+            text = "Clip " + number + " · " + (startMs / 1000) + "s to " + (endMs / 1000) + "s"
+            textSize = 14f
+            setTextColor(0xFFD5DDF0.toInt())
+        }
+        val play = Button(this).apply {
+            text = "Preview"
+            setOnClickListener {
+                preview.stopPlayback()
+                preview.setVideoURI(uri)
+                preview.setOnPreparedListener { preview.start() }
+                status.text = "Playing clip " + number
+            }
+        }
+        row.addView(info, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        row.addView(play, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        clipsList.addView(row, matchWrap())
+    }
+
+    private fun saveToGallery(source: File, displayName: String): Uri {
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, displayName)
             put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
@@ -195,6 +258,7 @@ class MainActivity : ComponentActivity() {
             values.clear()
             values.put(MediaStore.Video.Media.IS_PENDING, 0)
             contentResolver.update(destination, values, null, null)
+            return destination
         } catch (error: Exception) {
             contentResolver.delete(destination, null, null)
             throw error
