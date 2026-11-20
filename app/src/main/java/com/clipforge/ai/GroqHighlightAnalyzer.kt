@@ -183,7 +183,19 @@ object GroqHighlightAnalyzer {
     private fun chooseMoments(transcript: String, durationMs: Long, clipMs: Long, requestedCount: Int, key: String): List<Highlight> {
         val seconds = clipMs / 1000
         val maxStart = (durationMs - clipMs).coerceAtLeast(0) / 1000.0
-        val text = if (transcript.length > 50_000) transcript.substring(0, 50_000) else transcript
+        // Keep the transcript compact and sample it across the full video.
+        // Groq's current on-demand TPM limit is 8,000 tokens, so sending the
+        // entire transcript can exceed the limit on longer videos.
+        val lines = transcript.lines().filter { it.isNotBlank() }
+        val maxLines = 55
+        val sampled = if (lines.size <= maxLines) {
+            lines
+        } else {
+            (0 until maxLines).map { i ->
+                lines[(i.toLong() * (lines.size - 1) / (maxLines - 1)).toInt()]
+            }
+        }
+        val text = sampled.joinToString("\n") { it.take(240) }.take(14_000)
         val prompt = "Select exactly " + requestedCount + " distinct, non-overlapping moments from this timestamped transcript. Never return more than " + requestedCount + ". " +
             "Every clip must be exactly " + seconds + " seconds. Video duration is " + (durationMs / 1000) +
             " seconds. Start times must be between 0 and " + maxStart +
