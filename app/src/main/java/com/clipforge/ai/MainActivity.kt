@@ -92,15 +92,7 @@ class MainActivity : ComponentActivity() {
             text = "Video preview"; textSize = 17f
             setTextColor(0xFFF4F6FF.toInt()); setPadding(0, 8, 0, 8)
         }
-        preview = PlayerView(this).apply {
-            setBackgroundColor(0xFF000000.toInt())
-            useController = true
-            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-            setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT)
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(230)
-            )
-        }
+        preview = layoutInflater.inflate(R.layout.video_preview, page, false) as PlayerView
 
         chooseButton = Button(this).apply {
             text = "Choose video"
