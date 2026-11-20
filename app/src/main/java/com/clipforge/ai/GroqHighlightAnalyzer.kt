@@ -211,9 +211,10 @@ object GroqHighlightAnalyzer {
             val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
                 ?.bufferedReader()?.use { it.readText() } ?: ""
             if (code !in 200..299) throw IllegalStateException(errorMessage(body, code))
-            val content = JSONObject(body).getJSONArray("choices").getJSONObject(0)
-                .getJSONObject("message").getString("content")
-            val clips = JSONObject(content).optJSONArray("clips") ?: JSONArray()
+            val message = JSONObject(body).getJSONArray("choices").getJSONObject(0).getJSONObject("message")
+            val content = message.optString("content", "").trim()
+            if (content.isBlank()) error("Groq returned an empty AI response. Please try again.")
+            val clips = parseHighlightsJson(content).optJSONArray("clips") ?: JSONArray()
             val selected = mutableListOf<Highlight>()
             for (i in 0 until clips.length()) {
                 val item = clips.optJSONObject(i) ?: continue
@@ -229,6 +230,45 @@ object GroqHighlightAnalyzer {
             if (selected.isEmpty()) error("AI could not find suitable highlight moments.")
             return selected.sortedBy { it.startMs }
         } finally { conn.disconnect() }
+    }
+
+
+    // Groq may return valid JSON wrapped in Markdown fences or extra explanatory text.
+    // Extract the first complete JSON object before parsing the clip list.
+    private fun parseHighlightsJson(raw: String): JSONObject {
+        val cleaned = raw
+            .replace("```json", "", ignoreCase = true)
+            .replace("```", "")
+            .trim()
+        val start = cleaned.indexOf('{')
+        if (start < 0) error("AI response did not contain JSON. Please try again.")
+        var depth = 0
+        var inString = false
+        var escaped = false
+        for (i in start until cleaned.length) {
+            val ch = cleaned[i]
+            if (inString) {
+                if (escaped) escaped = false
+                else if (ch == '\\\\') escaped = true
+                else if (ch == '"') inString = false
+            } else {
+                when (ch) {
+                    '"' -> inString = true
+                    '{' -> depth++
+                    '}' -> {
+                        depth--
+                        if (depth == 0) {
+                            return try {
+                                JSONObject(cleaned.substring(start, i + 1))
+                            } catch (e: Exception) {
+                                error("AI returned invalid JSON. Please try again.")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        error("AI returned incomplete JSON. Please try again.")
     }
 
     private fun errorMessage(body: String, code: Int): String {
