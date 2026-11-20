@@ -97,7 +97,6 @@ class MainActivity : ComponentActivity() {
             useController = true
             setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
             setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT)
-            setSurfaceType(PlayerView.SURFACE_TYPE_TEXTURE_VIEW)
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(230)
             )
