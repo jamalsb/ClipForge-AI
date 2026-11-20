@@ -249,7 +249,7 @@ object GroqHighlightAnalyzer {
             val ch = cleaned[i]
             if (inString) {
                 if (escaped) escaped = false
-                else if (ch == '\\\\') escaped = true
+                else if (ch == '\\') escaped = true
                 else if (ch == '"') inString = false
             } else {
                 when (ch) {
