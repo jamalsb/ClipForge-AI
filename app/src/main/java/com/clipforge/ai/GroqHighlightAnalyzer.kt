@@ -2,6 +2,7 @@ package com.clipforge.ai
 
 import android.content.Context
 import android.media.MediaExtractor
+import android.media.MediaCodec
 import android.media.MediaMuxer
 import android.net.Uri
 import android.security.keystore.KeyGenParameterSpec
@@ -108,7 +109,7 @@ object GroqHighlightAnalyzer {
             val endUs = (startMs + lengthMs) * 1000
             extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
             val buffer = ByteBuffer.allocate(2 * 1024 * 1024)
-            val info = MediaMuxer.BufferInfo()
+            val info = MediaCodec.BufferInfo()
             while (true) {
                 buffer.clear()
                 val size = extractor.readSampleData(buffer, 0)
@@ -151,7 +152,8 @@ object GroqHighlightAnalyzer {
                     out.writeBytes("\r\n")
                 }
                 field("model", "whisper-large-v3-turbo")
-                field("response_format", "json")
+                field("response_format", "verbose_json")
+                field("timestamp_granularities[]", "segment")
                 out.writeBytes("--" + boundary + "\r\n")
                 out.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"audio.mp4\"\r\n")
                 out.writeBytes("Content-Type: audio/mp4\r\n\r\n")
@@ -162,7 +164,19 @@ object GroqHighlightAnalyzer {
             val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
                 ?.bufferedReader()?.use { it.readText() } ?: ""
             if (code !in 200..299) throw IllegalStateException(errorMessage(body, code))
-            return JSONObject(body).optString("text", "")
+            val response = JSONObject(body)
+            val segments = response.optJSONArray("segments")
+            if (segments != null && segments.length() > 0) {
+                val timed = StringBuilder()
+                for (i in 0 until segments.length()) {
+                    val segment = segments.getJSONObject(i)
+                    timed.append(segment.optDouble("start", 0.0)).append("-")
+                        .append(segment.optDouble("end", 0.0)).append(" ")
+                        .append(segment.optString("text")).append("\n")
+                }
+                return timed.toString()
+            }
+            return response.optString("text", "")
         } finally { conn.disconnect() }
     }
 
