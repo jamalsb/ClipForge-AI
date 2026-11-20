@@ -62,7 +62,7 @@ object GroqKeyStore {
 object GroqHighlightAnalyzer {
     data class Highlight(val startMs: Long, val endMs: Long, val title: String, val reason: String)
 
-    fun analyse(context: Context, uri: Uri, durationMs: Long, clipMs: Long, apiKey: String): List<Highlight> {
+    fun analyse(context: Context, uri: Uri, durationMs: Long, clipMs: Long, requestedCount: Int, apiKey: String): List<Highlight> {
         val transcript = StringBuilder()
         val chunkMs = 4 * 60 * 1000L
         var offset = 0L
@@ -82,7 +82,7 @@ object GroqHighlightAnalyzer {
             index++
         }
         if (transcript.isBlank()) error("No speech found. Please choose a video with clear spoken audio.")
-        return chooseMoments(transcript.toString(), durationMs, clipMs, apiKey)
+        return chooseMoments(transcript.toString(), durationMs, clipMs, requestedCount.coerceIn(1, 10), apiKey)
     }
 
     private fun extractAudio(context: Context, uri: Uri, startMs: Long, lengthMs: Long, output: File) {
@@ -180,11 +180,11 @@ object GroqHighlightAnalyzer {
         } finally { conn.disconnect() }
     }
 
-    private fun chooseMoments(transcript: String, durationMs: Long, clipMs: Long, key: String): List<Highlight> {
+    private fun chooseMoments(transcript: String, durationMs: Long, clipMs: Long, requestedCount: Int, key: String): List<Highlight> {
         val seconds = clipMs / 1000
         val maxStart = (durationMs - clipMs).coerceAtLeast(0) / 1000.0
         val text = if (transcript.length > 50_000) transcript.substring(0, 50_000) else transcript
-        val prompt = "Select up to 10 distinct, non-overlapping moments from this timestamped transcript. " +
+        val prompt = "Select exactly " + requestedCount + " distinct, non-overlapping moments from this timestamped transcript. Never return more than " + requestedCount + ". " +
             "Every clip must be exactly " + seconds + " seconds. Video duration is " + (durationMs / 1000) +
             " seconds. Start times must be between 0 and " + maxStart +
             ". Prefer strong hooks, useful information, emotional or surprising moments, and complete story beats. " +
@@ -225,7 +225,7 @@ object GroqHighlightAnalyzer {
                 selected.add(Highlight(start, end,
                     item.optString("title", "Highlight " + (i + 1)).take(90),
                     item.optString("reason", "Selected from the spoken content.").take(180)))
-                if (selected.size >= 10) break
+                if (selected.size >= requestedCount) break
             }
             if (selected.isEmpty()) error("AI could not find suitable highlight moments.")
             return selected.sortedBy { it.startMs }
