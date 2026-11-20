@@ -209,6 +209,10 @@ class MainActivity : ComponentActivity() {
         val uri = selectedVideo ?: return
         val seconds = listOf(15, 30, 45, 60)[lengthSpinner.selectedItemPosition]
         val clipMs = seconds * 1000L
+        if (videoDurationMs < clipMs) {
+            status.text = "This video is shorter than " + seconds + " seconds. Choose a shorter clip length."
+            return
+        }
         if (aiHighlights.isChecked) {
             val key = GroqKeyStore.read(this)
             if (key.isNullOrBlank()) {
