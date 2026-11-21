@@ -226,11 +226,21 @@ object GroqHighlightAnalyzer {
             val message = JSONObject(body).getJSONArray("choices").getJSONObject(0).getJSONObject("message")
             val content = message.optString("content", "").trim()
             if (content.isBlank()) error("Groq returned an empty AI response. Please try again.")
-            val clips = parseHighlightsJson(content).optJSONArray("clips") ?: JSONArray()
+            val parsed = parseHighlightsJson(content)
+            val clips = parsed.optJSONArray("clips")
+                ?: parsed.optJSONArray("highlights")
+                ?: parsed.optJSONArray("moments")
+                ?: JSONArray()
             val selected = mutableListOf<Highlight>()
             for (i in 0 until clips.length()) {
                 val item = clips.optJSONObject(i) ?: continue
-                val start = (item.optDouble("start", -1.0) * 1000).toLong()
+                val startSeconds = when {
+                    item.has("start") -> item.optDouble("start", -1.0)
+                    item.has("start_seconds") -> item.optDouble("start_seconds", -1.0)
+                    item.has("start_time") -> item.optDouble("start_time", -1.0)
+                    else -> -1.0
+                }
+                val start = (startSeconds * 1000).toLong()
                 if (start < 0 || start > durationMs - clipMs) continue
                 val end = start + clipMs
                 if (selected.any { start < it.endMs && end > it.startMs }) continue
@@ -252,12 +262,25 @@ object GroqHighlightAnalyzer {
             .replace("```json", "", ignoreCase = true)
             .replace("```", "")
             .trim()
-        val start = cleaned.indexOf('{')
-        if (start < 0) error("AI response did not contain JSON. Please try again.")
+        val objectStart = cleaned.indexOf('{')
+        val arrayStart = cleaned.indexOf('[')
+        // Some model responses return the clips array directly instead of
+        // wrapping it in {"clips":[...]}; accept both valid JSON shapes.
+        if (arrayStart >= 0 && (objectStart < 0 || arrayStart < objectStart)) {
+            val arrayEnd = cleaned.lastIndexOf(']')
+            if (arrayEnd > arrayStart) {
+                return try {
+                    JSONObject().put("clips", JSONArray(cleaned.substring(arrayStart, arrayEnd + 1)))
+                } catch (_: Exception) {
+                    error("AI returned invalid JSON. Please try again.")
+                }
+            }
+        }
+        if (objectStart < 0) error("AI response did not contain JSON. Please try again.")
         var depth = 0
         var inString = false
         var escaped = false
-        for (i in start until cleaned.length) {
+        for (i in objectStart until cleaned.length) {
             val ch = cleaned[i]
             if (inString) {
                 if (escaped) escaped = false
@@ -271,8 +294,8 @@ object GroqHighlightAnalyzer {
                         depth--
                         if (depth == 0) {
                             return try {
-                                JSONObject(cleaned.substring(start, i + 1))
-                            } catch (e: Exception) {
+                                JSONObject(cleaned.substring(objectStart, i + 1))
+                            } catch (_: Exception) {
                                 error("AI returned invalid JSON. Please try again.")
                             }
                         }
