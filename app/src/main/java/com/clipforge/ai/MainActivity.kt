@@ -256,11 +256,19 @@ class MainActivity : ComponentActivity() {
             }
             override fun getDropDownView(position: Int, convertView: android.view.View?, parent: ViewGroup): android.view.View {
                 return super.getDropDownView(position, convertView, parent).apply {
-                    (this as? TextView)?.apply { setTextColor(0xFF17243D.toInt()); textSize = 15f; setPadding(dp(14), dp(12), dp(12), dp(12)) }
+                    (this as? TextView)?.apply {
+                        setTextColor(0xFFF8FAFF.toInt())
+                        textSize = 15f
+                        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                        setPadding(dp(14), dp(12), dp(12), dp(12))
+                    }
                 }
             }
         }
         background = roundedBackground(0xFF111C32.toInt(), 0xFF526B92.toInt(), 12)
+        // Keep the popup dark and its option text bright so numbers remain readable.
+        setPopupBackgroundDrawable(roundedBackground(0xFF17243D.toInt(), 0xFF7FE4E0.toInt(), 12))
+        dropDownVerticalOffset = dp(6)
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
