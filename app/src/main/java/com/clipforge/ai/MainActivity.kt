@@ -280,7 +280,6 @@ class MainActivity : ComponentActivity() {
 
     private fun createClips() {
         val uri = selectedVideo ?: return
-        startClipWorkService()
         val seconds = listOf(60, 90, 120)[lengthSpinner.selectedItemPosition]
         val requestedCount = countSpinner.selectedItemPosition + 1
         val clipMs = seconds * 1000L
@@ -294,6 +293,7 @@ class MainActivity : ComponentActivity() {
                 status.text = "Save your Groq API key before using AI highlights."
                 return
             }
+            startClipWorkService()
             createButton.isEnabled = false
             chooseButton.isEnabled = false
             status.text = "AI is analysing the video's speech and selecting highlights. Keep the app open."
@@ -330,6 +330,7 @@ class MainActivity : ComponentActivity() {
             status.text = "This video is shorter than " + seconds + " seconds. Choose a shorter clip length."
             return
         }
+        startClipWorkService()
         pendingClips.clear()
         clipTitles.clear()
         clipReasons.clear()
