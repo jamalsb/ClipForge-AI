@@ -280,6 +280,7 @@ class MainActivity : ComponentActivity() {
 
     private fun createClips() {
         val uri = selectedVideo ?: return
+        startClipWorkService()
         val seconds = listOf(60, 90, 120)[lengthSpinner.selectedItemPosition]
         val requestedCount = countSpinner.selectedItemPosition + 1
         val clipMs = seconds * 1000L
@@ -349,6 +350,7 @@ class MainActivity : ComponentActivity() {
     private fun exportNext(uri: Uri) {
         if (pendingClips.isEmpty()) {
             status.text = "Finished! " + completedCount + " clips saved in Movies/ClipForge AI."
+            stopClipWorkService()
             createButton.isEnabled = true
             chooseButton.isEnabled = true
             return
@@ -451,6 +453,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun fail(message: String) {
+        stopClipWorkService()
         status.text = message
         pendingClips.clear()
         currentOutput?.delete()
@@ -467,7 +470,16 @@ class MainActivity : ComponentActivity() {
         preview.player = null
         player?.release()
         player = null
-        worker.shutdownNow()
+        // Keep background analysis from being cancelled when the Activity is temporarily stopped.
         super.onDestroy()
+    }
+
+    private fun startClipWorkService() {
+        val intent = Intent(this, ClipWorkService::class.java).apply { action = ClipWorkService.ACTION_START }
+        if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+    }
+
+    private fun stopClipWorkService() {
+        stopService(Intent(this, ClipWorkService::class.java))
     }
 }
