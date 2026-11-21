@@ -371,13 +371,11 @@ class MainActivity : ComponentActivity() {
                 exportResult: ExportResult
             ) {
                 try {
-                    val savedUri = saveToGallery(output, "ClipForge_" + clipNumber + "_" + (startMs / 1000) + "s.mp4")
                     completedCount++
-                    addClipRow(clipNumber, startMs, endMs, savedUri,
+                    addClipRow(clipNumber, startMs, endMs, output,
                         clipTitles.getOrNull(clipNumber - 1) ?: ("Clip " + clipNumber),
                         clipReasons.getOrNull(clipNumber - 1).orEmpty())
-                    output.delete()
-                    status.text = "Exported " + completedCount + " clips..."
+                    status.text = "Exported " + completedCount + " clips. Use Preview or Download for each clip."
                     exportNext(uri)
                 } catch (error: Exception) {
                     fail("Could not save the exported clip: " + error.message)
@@ -400,34 +398,49 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun addClipRow(number: Int, startMs: Long, endMs: Long, uri: Uri, title: String, reason: String) {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(5), 0, dp(5))
-        }
+    private fun addClipRow(number: Int, startMs: Long, endMs: Long, file: File, title: String, reason: String) {
+        val card = makeCard()
         val info = TextView(this).apply {
             text = title + "\n" + (startMs / 1000) + "s to " + (endMs / 1000) + "s"
             textSize = 14f
             setTextColor(0xFFD5DDF0.toInt())
         }
-        val play = Button(this).apply {
-            text = "Preview"
-            setOnClickListener {
-                playPreview(uri)
-                status.text = "Playing clip " + number
-            }
-        }
-        row.addView(info, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        row.addView(play, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        card.addView(info, matchWrap())
         if (reason.isNotBlank()) {
-            row.addView(TextView(this).apply {
+            card.addView(TextView(this).apply {
                 text = reason
                 textSize = 12f
                 setTextColor(0xFF9DAAC2.toInt())
+                setPadding(0, dp(5), 0, dp(8))
             }, matchWrap())
         }
-        clipsList.addView(row, matchWrap())
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val play = makeButton("▶ Preview", 0xFF526B92.toInt(), 0xFF344768.toInt()).apply {
+            setOnClickListener {
+                playPreview(Uri.fromFile(file))
+                status.text = "Playing clip " + number
+            }
+        }
+        val download = makeButton("↓ Download", 0xFF18B9A5.toInt(), 0xFF3978E8.toInt()).apply {
+            setOnClickListener {
+                try {
+                    val saved = saveToGallery(file, "ClipForge_" + number + "_" + (startMs / 1000) + "s.mp4")
+                    status.text = "Clip " + number + " downloaded to Movies/ClipForge AI."
+                    Toast.makeText(this@MainActivity, "Clip downloaded", Toast.LENGTH_SHORT).show()
+                } catch (error: Exception) {
+                    status.text = "Download failed: " + (error.message ?: "Could not save clip.")
+                }
+            }
+        }
+        actions.addView(play, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        actions.addView(download, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+            leftMargin = dp(8)
+        })
+        card.addView(actions, matchWrap())
+        clipsList.addView(card, cardParams())
     }
 
     private fun saveToGallery(source: File, displayName: String): Uri {
