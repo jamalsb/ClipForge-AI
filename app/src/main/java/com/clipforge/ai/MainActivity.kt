@@ -17,6 +17,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.effect.Presentation
+import androidx.media3.transformer.Effects
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
@@ -25,12 +27,15 @@ import androidx.media3.ui.PlayerView
 import java.io.File
 import java.io.FileInputStream
 
+@androidx.media3.common.util.UnstableApi
 class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var chooseButton: Button
     private lateinit var createButton: Button
     private lateinit var lengthSpinner: Spinner
     private lateinit var countSpinner: Spinner
+    private lateinit var formatSpinner: Spinner
+    private var outputVertical = true
     private lateinit var preview: PlayerView
     private lateinit var clipsList: LinearLayout
     private lateinit var aiHighlights: CheckBox
@@ -127,6 +132,19 @@ class MainActivity : ComponentActivity() {
         settingsCard.addView(fieldLabel("How many clips?  (1 to 10)"), matchWrap())
         countSpinner = styledSpinner((1..10).map { "$it clips" }).apply { setSelection(4) }
         settingsCard.addView(countSpinner, matchWrap())
+        settingsCard.addView(fieldLabel("Social media format"), matchWrap())
+        formatSpinner = styledSpinner(listOf(
+            "Instagram Reels · 9:16",
+            "TikTok · 9:16",
+            "Facebook Reels · 9:16",
+            "YouTube · 16:9",
+            "X (Twitter) · 16:9"
+        )).apply { setSelection(0) }
+        settingsCard.addView(formatSpinner, matchWrap())
+        settingsCard.addView(TextView(this).apply {
+            text = "Exports at 720p to reduce processing time. Vertical for Reels/Shorts and landscape for YouTube/X."
+            textSize = 12f; setTextColor(0xFF9EACCA.toInt()); setPadding(0, dp(6), 0, dp(4))
+        }, matchWrap())
         val countHelp = TextView(this).apply {
             text = "Choose the exact number you want. For example, selecting 5 creates up to 5 clips, not 10."
             textSize = 12f; setTextColor(0xFF9EACCA.toInt()); setPadding(0, dp(6), 0, dp(4))
@@ -258,6 +276,7 @@ class MainActivity : ComponentActivity() {
                 return super.getDropDownView(position, convertView, parent).apply {
                     (this as? TextView)?.apply {
                         setTextColor(0xFFF8FAFF.toInt())
+                        setBackgroundColor(0xFF17243D.toInt())
                         textSize = 15f
                         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                         setPadding(dp(14), dp(12), dp(12), dp(12))
@@ -290,6 +309,7 @@ class MainActivity : ComponentActivity() {
         val uri = selectedVideo ?: return
         val seconds = listOf(60, 90, 120)[lengthSpinner.selectedItemPosition]
         val requestedCount = countSpinner.selectedItemPosition + 1
+        outputVertical = formatSpinner.selectedItemPosition <= 2
         val clipMs = seconds * 1000L
         if (videoDurationMs < clipMs) {
             status.text = "This video is shorter than " + seconds + " seconds. Choose a shorter clip length."
@@ -372,7 +392,15 @@ class MainActivity : ComponentActivity() {
             MediaItem.ClippingConfiguration.Builder()
                 .setStartPositionMs(startMs).setEndPositionMs(endMs).build()
         ).build()
-        val editedItem = EditedMediaItem.Builder(mediaItem).build()
+        val targetWidth = if (outputVertical) 720 else 1280
+        val targetHeight = if (outputVertical) 1280 else 720
+        val formatEffect = Presentation.createForWidthAndHeight(
+            targetWidth, targetHeight, Presentation.LAYOUT_SCALE_TO_FIT
+        )
+        val editedItem = EditedMediaItem.Builder(mediaItem)
+            .setFrameRate(30)
+            .setEffects(Effects(emptyList(), listOf(formatEffect)))
+            .build()
         val listener = object : Transformer.Listener {
             override fun onCompleted(
                 composition: androidx.media3.transformer.Composition,
