@@ -27,7 +27,7 @@ import androidx.media3.ui.PlayerView
 import java.io.File
 import java.io.FileInputStream
 
-@androidx.media3.common.util.UnstableApi
+@OptIn(androidx.media3.common.util.UnstableApi::class)
 class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var chooseButton: Button
