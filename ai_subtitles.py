@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -38,9 +39,7 @@ def transcribe_video(video_path: Path, output_srt: Path | None, temp_dir: Path, 
     entries: list[tuple[float, float, str]] = []
     chunk_seconds = 300
 
-    for offset in range(0, int(duration) + 1, chunk_seconds):
-        if offset >= duration:
-            break
+    def transcribe_chunk(offset: int) -> list[tuple[float, float, str]]:
         audio_path = temp_dir / f"audio_{offset:08d}.flac"
         command = [
             ffmpeg, "-y", "-ss", str(offset), "-i", str(video_path),
@@ -52,8 +51,9 @@ def transcribe_video(video_path: Path, output_srt: Path | None, temp_dir: Path, 
             audio_path.unlink(missing_ok=True)
             if offset == 0:
                 raise HTTPException(status_code=400, detail="Could not extract audio from this video.")
-            continue
+            return []
 
+        chunk_entries: list[tuple[float, float, str]] = []
         try:
             with audio_path.open("rb") as audio_file:
                 transcript = client.audio.transcriptions.create(
@@ -68,11 +68,18 @@ def transcribe_video(video_path: Path, output_srt: Path | None, temp_dir: Path, 
                 start = float(getattr(segment, "start", 0)) + offset
                 end = float(getattr(segment, "end", 0)) + offset
                 if text and end > start:
-                    entries.append((start, end, text))
+                    chunk_entries.append((start, end, text))
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"AI transcription failed: {str(exc)[:240]}") from exc
         finally:
             audio_path.unlink(missing_ok=True)
+        return chunk_entries
+
+    offsets = [offset for offset in range(0, int(duration) + 1, chunk_seconds) if offset < duration]
+    # Transcribe chunks at the same time; map() keeps them in time order.
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        for chunk_entries in pool.map(transcribe_chunk, offsets):
+            entries.extend(chunk_entries)
 
     if not entries:
         raise HTTPException(status_code=422, detail="No spoken words were detected in this video.")

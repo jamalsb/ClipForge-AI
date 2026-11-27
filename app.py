@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import uuid
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -22,7 +23,12 @@ OUTPUTS = WORK / "outputs"
 for directory in (UPLOADS, OUTPUTS):
     directory.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="ClipForge AI", version="0.3.0")
+# Speed settings. Override on the server with environment variables if needed.
+FFMPEG_PRESET = os.getenv("FFMPEG_PRESET", "ultrafast")
+FFMPEG_CRF = os.getenv("FFMPEG_CRF", "25")
+ENCODE_WORKERS = max(1, min(4, int(os.getenv("ENCODE_WORKERS", os.cpu_count() or 2))))
+
+app = FastAPI(title="ClipForge AI", version="0.3.1")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -66,7 +72,7 @@ async def process_video(
     video: UploadFile = File(...),
     clip_seconds: int = Form(30),
     aspect: str = Form("9:16"),
-    resolution: str = Form("1080"),
+    resolution: str = Form("720"),
     subtitle_mode: str = Form("off"),
     highlight_mode: str = Form("off"),
 ):
@@ -130,7 +136,7 @@ async def process_video(
                 raise HTTPException(status_code=400, detail="This would create over 200 clips. Choose a longer clip length.")
             clip_specs = [(index * clip_seconds, clip_seconds) for index in range(clip_count)]
 
-        outputs = []
+        jobs = []
         for index, (start, segment_length) in enumerate(clip_specs):
             for output_aspect in export_aspects:
                 width, height = dimensions[output_aspect]
@@ -143,14 +149,23 @@ async def process_video(
                 command = [
                     ffmpeg, "-y", "-ss", str(start), "-i", str(source),
                     "-t", str(segment_length), "-vf", scale_pad,
-                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                    "-c:v", "libx264", "-preset", FFMPEG_PRESET, "-crf", FFMPEG_CRF,
+                    "-threads", "2",
                     "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
                     str(output)
                 ]
-                result = subprocess.run(command, capture_output=True, text=True, check=False)
-                if result.returncode:
-                    raise HTTPException(status_code=500, detail=f"FFmpeg failed on clip {index + 1} ({output_aspect}): {(result.stderr or '')[-900:]}")
-                outputs.append(output)
+                jobs.append((index, output_aspect, output, command))
+
+        def encode(job):
+            index, output_aspect, output, command = job
+            result = subprocess.run(command, capture_output=True, text=True, check=False)
+            if result.returncode:
+                raise HTTPException(status_code=500, detail=f"FFmpeg failed on clip {index + 1} ({output_aspect}): {(result.stderr or '')[-900:]}")
+            return output
+
+        # Encode several clips at the same time instead of one after another.
+        with ThreadPoolExecutor(max_workers=ENCODE_WORKERS) as pool:
+            outputs = list(pool.map(encode, jobs))
 
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
             for output in outputs:
