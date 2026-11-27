@@ -6,6 +6,40 @@ import os
 from fastapi import HTTPException
 
 
+MAX_TRANSCRIPT_CHARS = 12000  # keeps the request under Groq's free-tier token limit
+
+
+def _parse_json(raw: str):
+    """Parse model output that may be wrapped in Markdown fences or extra text."""
+    cleaned = (raw or "").replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+    if not cleaned:
+        raise ValueError("empty response")
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(cleaned):
+        if char in "{[":
+            try:
+                value, _ = decoder.raw_decode(cleaned[index:])
+                return value
+            except json.JSONDecodeError:
+                continue
+    raise ValueError("no valid JSON found")
+
+
+def _sample_lines(lines: list[str], limit: int) -> str:
+    """Join lines, sampling evenly across the whole video if the text is too long."""
+    text = "\n".join(lines)
+    if len(text) <= limit:
+        return text
+    step = len(text) / limit
+    keep = max(1, int(len(lines) / step))
+    picked = [lines[int(i * len(lines) / keep)] for i in range(keep)]
+    return "\n".join(picked)[:limit]
+
+
 def select_highlights(
     transcript_segments: list[tuple[float, float, str]],
     duration: float,
@@ -22,11 +56,10 @@ def select_highlights(
     except ImportError as exc:
         raise HTTPException(status_code=503, detail="The AI model package is not installed.") from exc
 
-    transcript = "\n".join(
-        f"[{start:.1f}-{end:.1f}] {text}" for start, end, text in transcript_segments
+    transcript = _sample_lines(
+        [f"[{start:.1f}-{end:.1f}] {text[:240]}" for start, end, text in transcript_segments],
+        MAX_TRANSCRIPT_CHARS,
     )
-    if len(transcript) > 24000:
-        transcript = transcript[:24000]
 
     if not transcript.strip():
         raise HTTPException(status_code=422, detail="There is no transcript to analyse for highlights.")
@@ -58,11 +91,20 @@ def select_highlights(
             temperature=0.2,
             response_format={"type": "json_object"},
         )
-        payload = json.loads(response.choices[0].message.content or "{}")
+        payload = _parse_json(response.choices[0].message.content or "")
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AI highlight analysis failed: {str(exc)[:240]}") from exc
 
-    raw_clips = payload.get("clips", []) if isinstance(payload, dict) else []
+    # Accept {"clips": [...]}, other common key names, or a bare list.
+    if isinstance(payload, list):
+        raw_clips = payload
+    elif isinstance(payload, dict):
+        raw_clips = next(
+            (payload[key] for key in ("clips", "highlights", "moments") if isinstance(payload.get(key), list)),
+            [],
+        )
+    else:
+        raw_clips = []
     if not isinstance(raw_clips, list):
         raise HTTPException(status_code=502, detail="AI highlight response had an invalid format.")
 
@@ -71,8 +113,9 @@ def select_highlights(
     for item in raw_clips:
         if not isinstance(item, dict):
             continue
+        raw_start = next((item[key] for key in ("start", "start_seconds", "start_time") if key in item), None)
         try:
-            start = min(max(float(item.get("start", 0)), 0.0), max_start)
+            start = min(max(float(raw_start), 0.0), max_start)
         except (TypeError, ValueError):
             continue
         title = str(item.get("title", "Highlight")).strip()[:90] or "Highlight"
