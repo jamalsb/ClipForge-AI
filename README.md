@@ -11,10 +11,11 @@ ClipForge AI is being built as a browser-based video clipping service. The curre
 - Export 720p or 1080p
 - Download clips together as a ZIP, with format labels in each filename
 - Optional Urdu/English multilingual speech transcription to an SRT subtitle file
-- AI-ranked short highlights selected from the transcript, with title/reason metadata in the ZIP
+- AI-ranked short highlights selected from the transcript, with title, description, hashtags and reason metadata in the ZIP (`highlights.json` and a ready-to-paste `titles_and_descriptions.txt`)
 - Long audio is extracted and transcribed in smaller chunks
 
 ## Not available yet
+- Direct upload to YouTube and other social platforms (needs platform account authorisation)
 - Translation from one subtitle language to another
 - Captions permanently burned into the video
 - Automatic face tracking and speaker-aware reframing

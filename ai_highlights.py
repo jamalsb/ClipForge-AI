@@ -110,7 +110,10 @@ def select_highlights(
         f"0 to {max(0, duration - clip_seconds):.1f} seconds. Return at most {max_clips} "
         "non-duplicate moments. Prefer moments with enough spoken context and avoid cutting "
         "mid-sentence when possible. Output only a JSON object with a 'clips' array. "
-        "Each item must contain numeric 'start', a short 'title', and a short 'reason'. "
+        "Each item must contain numeric 'start', a short 'title', a short 'reason', a 'description' "
+        "(one or two engaging sentences for a social media post, based only on what is said in that moment) "
+        "and 'hashtags' (an array of 3 to 5 relevant hashtags). Write the title and description in the "
+        "same language as the transcript. "
         "Do not add any text before or after the JSON object. "
         "Transcript:\n" + transcript
     )
@@ -151,11 +154,21 @@ def select_highlights(
             continue
         title = str(item.get("title", "Highlight")).strip()[:90] or "Highlight"
         reason = str(item.get("reason", "Selected from the spoken content.")).strip()[:220]
+        description = str(item.get("description", "")).strip()[:400] or title
+        raw_tags = item.get("hashtags", [])
+        hashtags: list[str] = []
+        if isinstance(raw_tags, list):
+            for tag in raw_tags:
+                cleaned = "".join(str(tag).split()).lstrip("#")
+                if cleaned and f"#{cleaned}" not in hashtags:
+                    hashtags.append(f"#{cleaned}"[:40])
         valid.append({
             "start": round(start, 2),
             "end": round(start + clip_seconds, 2),
             "title": title,
             "reason": reason,
+            "description": description,
+            "hashtags": hashtags[:5],
         })
 
     # Keep the model's relevance ranking while removing overlapping selections.

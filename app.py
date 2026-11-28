@@ -159,6 +159,13 @@ async def process_video(
                 archive.write(subtitle_path, arcname="subtitles.srt")
             if highlights:
                 archive.writestr("highlights.json", json.dumps(highlights, ensure_ascii=False, indent=2))
+                posts = "\n\n".join(
+                    f"Clip {number} (clip_{number:03d}_*.mp4)\nTitle: {item['title']}\n"
+                    f"Description: {item.get('description', item['title'])}\n"
+                    f"Hashtags: {' '.join(item.get('hashtags', []))}"
+                    for number, item in enumerate(highlights, start=1)
+                )
+                archive.writestr("titles_and_descriptions.txt", posts + "\n")
 
         return {"job_id": job_id, "clip_count": len(outputs),
                 "duration_seconds": round(duration, 1),
