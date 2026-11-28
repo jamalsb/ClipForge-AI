@@ -33,8 +33,20 @@ form.addEventListener("submit", async (event) => {
   resultBox.hidden = true;
   try {
     const response = await fetch("/api/process", { method: "POST", body: new FormData(form) });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || "Processing failed.");
+    // Read as text first: a gateway timeout or crash returns HTML, not JSON.
+    const raw = await response.text();
+    let payload = null;
+    try { payload = JSON.parse(raw); } catch (parseError) { payload = null; }
+    if (!payload) {
+      const hint = [502, 503, 504].includes(response.status)
+        ? "The server timed out or restarted while processing (common on the free Render plan with long videos). Try a shorter video or lower resolution."
+        : (response.status === 413 ? "The video is too large for the server." : "The server sent an unreadable reply.");
+      throw new Error(hint + " (HTTP " + response.status + ")");
+    }
+    if (!response.ok) {
+      const detail = typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail || "");
+      throw new Error(detail || "Processing failed.");
+    }
     const link = document.createElement("a");
     link.href = payload.download_url;
     link.textContent = "Download clips ZIP";

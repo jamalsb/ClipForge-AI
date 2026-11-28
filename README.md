@@ -29,7 +29,7 @@ Never put an API key in frontend JavaScript, this README, a public GitHub file, 
 
 If the key is not configured, normal clip creation still works. Selecting AI subtitles or AI highlight selection returns a clear setup error rather than pretending AI work was completed.
 
-AI highlight selection reuses the timestamped transcript, asks Groq's chat model to rank short moments, removes overlapping selections, and exports the selected clips. The ZIP includes `highlights.json` with each selected clip title, reason, and source timestamps. The default chat model is `openai/gpt-oss-20b`; set `GROQ_HIGHLIGHT_MODEL` as a private server environment variable to override it.
+AI highlight selection reuses the timestamped transcript and asks the free, keyless APIsFreeLLM chat service (https://api.apisfreellm.com) to rank short moments. No key is needed for this step. Overlapping selections are removed and the selected clips are exported. The ZIP includes `highlights.json` with each selected clip title, reason, and source timestamps. That service is text-only, so speech-to-text still uses Groq Whisper. Optional server variables: `FREE_LLM_URL` and `FREE_LLM_MODEL` to point at a different OpenAI-compatible chat endpoint. The free service has per-IP limits and no uptime guarantee; if it is busy, ClipForge retries a few times and then shows a clear error.
 
 The transcription model detects the spoken language and returns timestamped segments. The ZIP includes a `subtitles.srt` file. The SRT is a separate subtitle file; this build does not burn captions into the MP4 clips.
 
@@ -51,4 +51,4 @@ Open `http://127.0.0.1:8000`.
 For an online service, the API must run on a server with FFmpeg installed. The current build still uses the server's local disk for temporary uploads and outputs. It does not yet include durable cloud storage, a background job queue, or multi-user accounts, so it is a development foundation rather than a production-ready public service.
 
 ## Project status
-Version 0.3.0 development build. AI speech transcription and transcript-based highlight selection are implemented behind the Groq API key. Full cloud-service infrastructure, translated subtitles, burned-in captions and smart reframing remain in progress.
+Version 0.3.0 development build. AI speech transcription uses the Groq API key; transcript-based highlight selection uses the free APIsFreeLLM service. Full cloud-service infrastructure, translated subtitles, burned-in captions and smart reframing remain in progress.
