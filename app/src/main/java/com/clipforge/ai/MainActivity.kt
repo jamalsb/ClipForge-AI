@@ -1,6 +1,9 @@
 package com.clipforge.ai
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentValues
+import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.content.Intent
@@ -43,6 +46,8 @@ class MainActivity : ComponentActivity() {
     private val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
     private var clipTitles = mutableListOf<String>()
     private var clipReasons = mutableListOf<String>()
+    private var clipDescriptions = mutableListOf<String>()
+    private var clipHashtags = mutableListOf<String>()
     private var player: ExoPlayer? = null
     private var selectedVideo: Uri? = null
     private var videoDurationMs = 0L
@@ -332,10 +337,14 @@ class MainActivity : ComponentActivity() {
                         pendingClips.clear()
                         clipTitles.clear()
                         clipReasons.clear()
+                        clipDescriptions.clear()
+                        clipHashtags.clear()
                         selected.forEach { clip ->
                             pendingClips.add(clip.startMs to clip.endMs)
                             clipTitles.add(clip.title)
                             clipReasons.add(clip.reason)
+                            clipDescriptions.add(clip.description)
+                            clipHashtags.add(clip.hashtags.joinToString(" "))
                         }
                         completedCount = 0
                         clipsList.removeAllViews()
@@ -362,11 +371,15 @@ class MainActivity : ComponentActivity() {
         pendingClips.clear()
         clipTitles.clear()
         clipReasons.clear()
+        clipDescriptions.clear()
+        clipHashtags.clear()
         repeat(count) { index ->
             val start = index * clipMs
             pendingClips.add(start to (start + clipMs))
             clipTitles.add("Clip " + (index + 1))
             clipReasons.add("")
+            clipDescriptions.add("")
+            clipHashtags.add("")
         }
         completedCount = 0
         clipsList.removeAllViews()
@@ -410,7 +423,9 @@ class MainActivity : ComponentActivity() {
                     completedCount++
                     addClipRow(clipNumber, startMs, endMs, output,
                         clipTitles.getOrNull(clipNumber - 1) ?: ("Clip " + clipNumber),
-                        clipReasons.getOrNull(clipNumber - 1).orEmpty())
+                        clipReasons.getOrNull(clipNumber - 1).orEmpty(),
+                        clipDescriptions.getOrNull(clipNumber - 1).orEmpty(),
+                        clipHashtags.getOrNull(clipNumber - 1).orEmpty())
                     status.text = "Exported " + completedCount + " clips. Use Preview or Download for each clip."
                     exportNext(uri)
                 } catch (error: Exception) {
@@ -434,7 +449,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun addClipRow(number: Int, startMs: Long, endMs: Long, file: File, title: String, reason: String) {
+    private fun addClipRow(number: Int, startMs: Long, endMs: Long, file: File, title: String, reason: String, description: String, hashtags: String) {
         val card = makeCard()
         val info = TextView(this).apply {
             text = title + "\n" + (startMs / 1000) + "s to " + (endMs / 1000) + "s"
@@ -448,6 +463,34 @@ class MainActivity : ComponentActivity() {
                 textSize = 12f
                 setTextColor(0xFF9DAAC2.toInt())
                 setPadding(0, dp(5), 0, dp(8))
+            }, matchWrap())
+        }
+        if (description.isNotBlank()) {
+            card.addView(TextView(this).apply {
+                text = description
+                textSize = 13f
+                setTextColor(0xFFD5DDF0.toInt())
+                setTextIsSelectable(true)
+                setPadding(0, 0, 0, dp(5))
+            }, matchWrap())
+        }
+        if (hashtags.isNotBlank()) {
+            card.addView(TextView(this).apply {
+                text = hashtags
+                textSize = 13f
+                setTextColor(0xFF9A7BFF.toInt())
+                setTextIsSelectable(true)
+                setPadding(0, 0, 0, dp(8))
+            }, matchWrap())
+        }
+        if (description.isNotBlank() || hashtags.isNotBlank()) {
+            val copyText = title + "\n\n" + description + (if (hashtags.isNotBlank()) "\n\n" + hashtags else "")
+            card.addView(makeButton("\u29C9 Copy title + description + hashtags", 0xFF7A5CE0.toInt(), 0xFF4B3AA8.toInt()).apply {
+                setOnClickListener {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("ClipForge post text", copyText))
+                    Toast.makeText(this@MainActivity, "Copied. Paste it when you upload.", Toast.LENGTH_SHORT).show()
+                }
             }, matchWrap())
         }
         val actions = LinearLayout(this).apply {
